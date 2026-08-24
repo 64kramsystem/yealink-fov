@@ -1,10 +1,10 @@
 # yealink-fov
 
-`yealink-fov` is a small command-line tool for changing the field of view on a
+`yealink-fov` is a small command-line tool for changing camera settings on a
 Yealink UVC30 Desktop webcam without installing Yealink USB Connect.
 
-It talks directly to the camera over USB HID and supports the three FOV values
-offered by the camera: 70°, 90°, and 120°.
+It talks directly to the camera over USB HID and supports field of view (70°,
+90°, or 120°) and wide dynamic range (levels 0 through 5).
 
 ## Install
 
@@ -34,8 +34,22 @@ yealink-fov 90
 yealink-fov 120
 ```
 
-The tool reads the setting back from the webcam, saves it on the device, and
-exits with an error if the camera did not apply it.
+The explicit `fov` form is also accepted:
+
+```sh
+yealink-fov fov 90
+```
+
+Set wide dynamic range to any level from 0 through 5:
+
+```sh
+yealink-fov wdr 0
+yealink-fov wdr 5
+```
+
+Video capture applications such as OBS can remain open. The tool reads each
+setting back from the webcam, saves it on the device, and exits with an error
+if the camera did not apply it.
 
 If multiple UVC30 cameras are connected, select one by USB serial number:
 
@@ -61,9 +75,9 @@ Headless or SSH-only Linux systems may require a site-specific group rule.
 ## Scope
 
 This project is an independent, minimal implementation of the USB messages
-needed to set FOV. It contains no Yealink code or binaries and is not affiliated
-with or endorsed by Yealink. The observed message format is documented in
-[`docs/protocol.md`](docs/protocol.md).
+needed to set FOV and WDR. It contains no Yealink code or binaries and is not
+affiliated with or endorsed by Yealink. The observed message format is
+documented in [`docs/protocol.md`](docs/protocol.md).
 
 ## License
 

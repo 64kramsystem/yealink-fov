@@ -12,6 +12,7 @@ const REPORT_LEN: usize = 64;
 const CAMERA_SET: u16 = 0x0211;
 const CAMERA_GET: u16 = 0x0212;
 const CAMERA_SAVE: u32 = 46;
+const CAMERA_WDR: u32 = 40;
 const CAMERA_FOV: u32 = 56;
 const CAMERA_PARAM_LEN: usize = 32;
 const REPLY_TIMEOUT: Duration = Duration::from_secs(2);
@@ -47,6 +48,27 @@ impl TryFrom<i32> for Fov {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct WdrLevel(u8);
+
+impl WdrLevel {
+    pub fn value(self) -> u8 {
+        self.0
+    }
+}
+
+impl TryFrom<i32> for WdrLevel {
+    type Error = anyhow::Error;
+
+    fn try_from(value: i32) -> Result<Self> {
+        let value = u8::try_from(value)
+            .ok()
+            .filter(|value| *value <= 5)
+            .ok_or_else(|| anyhow!("unsupported WDR level {value}; choose a value from 0 to 5"))?;
+        Ok(Self(value))
+    }
+}
+
 pub struct Camera {
     device: HidDevice,
     next_transaction: u16,
@@ -72,41 +94,53 @@ impl Camera {
     }
 
     pub fn set_fov(&mut self, fov: Fov) -> Result<()> {
-        self.exchange_camera(CAMERA_SET, CAMERA_FOV, fov.degrees())?;
-        let deadline = Instant::now() + APPLY_TIMEOUT;
-        loop {
-            let actual = self.get_fov()?;
-            if actual == fov {
-                self.exchange_camera(CAMERA_SET, CAMERA_SAVE, 1)?;
-                return Ok(());
-            }
-            if Instant::now() >= deadline {
-                bail!(
-                    "camera kept reporting {} degrees after setting {}",
-                    actual.degrees(),
-                    fov.degrees()
-                );
-            }
-            std::thread::sleep(Duration::from_millis(50));
-        }
+        self.set_camera_value(CAMERA_FOV, fov.degrees(), "FOV")
     }
 
     pub fn get_fov(&mut self) -> Result<Fov> {
-        let reply = self.exchange_camera(CAMERA_GET, CAMERA_FOV, -1)?;
-        if reply.payload.len() < 8 {
-            bail!("camera returned a truncated FOV response");
-        }
-        let operation = u32::from_le_bytes(reply.payload[0..4].try_into().unwrap());
-        if operation != CAMERA_FOV {
-            bail!("camera returned operation {operation}, expected {CAMERA_FOV}");
-        }
-        let degrees = i32::from_le_bytes(reply.payload[4..8].try_into().unwrap());
+        let degrees = self.get_camera_value(CAMERA_FOV)?;
         match degrees {
             70 => Ok(Fov::Deg70),
             90 => Ok(Fov::Deg90),
             120 => Ok(Fov::Deg120),
             _ => bail!("camera returned unsupported FOV {degrees}"),
         }
+    }
+
+    pub fn set_wdr(&mut self, level: WdrLevel) -> Result<()> {
+        self.set_camera_value(CAMERA_WDR, i32::from(level.value()), "WDR level")
+    }
+
+    pub fn get_wdr(&mut self) -> Result<WdrLevel> {
+        WdrLevel::try_from(self.get_camera_value(CAMERA_WDR)?)
+    }
+
+    fn set_camera_value(&mut self, operation: u32, value: i32, label: &str) -> Result<()> {
+        self.exchange_camera(CAMERA_SET, operation, value)?;
+        let deadline = Instant::now() + APPLY_TIMEOUT;
+        loop {
+            let actual = self.get_camera_value(operation)?;
+            if actual == value {
+                self.exchange_camera(CAMERA_SET, CAMERA_SAVE, 1)?;
+                return Ok(());
+            }
+            if Instant::now() >= deadline {
+                bail!("camera kept reporting {actual} for {label} after setting {value}");
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    }
+
+    fn get_camera_value(&mut self, operation: u32) -> Result<i32> {
+        let reply = self.exchange_camera(CAMERA_GET, operation, -1)?;
+        if reply.payload.len() < 8 {
+            bail!("camera returned a truncated parameter response");
+        }
+        let returned_operation = u32::from_le_bytes(reply.payload[0..4].try_into().unwrap());
+        if returned_operation != operation {
+            bail!("camera returned operation {returned_operation}, expected {operation}");
+        }
+        Ok(i32::from_le_bytes(reply.payload[4..8].try_into().unwrap()))
     }
 
     fn exchange_camera(&mut self, message: u16, operation: u32, value: i32) -> Result<Reply> {
@@ -316,6 +350,22 @@ mod tests {
 
         assert_eq!(&report[4..8], &[0x11, 0x02, 0x07, 0x00]);
         assert_eq!(&report[20..32], &[0x38, 0, 0, 0, 0x5a, 0, 0, 0, 1, 0, 0, 0]);
+    }
+
+    #[test]
+    fn builds_the_wdr_set_report() {
+        let report = camera_param_report(CAMERA_SET, 9, CAMERA_WDR, 5);
+
+        assert_eq!(&report[4..8], &[0x11, 0x02, 0x09, 0x00]);
+        assert_eq!(&report[20..32], &[40, 0, 0, 0, 5, 0, 0, 0, 1, 0, 0, 0]);
+    }
+
+    #[test]
+    fn validates_wdr_levels() {
+        assert_eq!(WdrLevel::try_from(0).unwrap().value(), 0);
+        assert_eq!(WdrLevel::try_from(5).unwrap().value(), 5);
+        assert!(WdrLevel::try_from(-1).is_err());
+        assert!(WdrLevel::try_from(6).is_err());
     }
 
     #[test]

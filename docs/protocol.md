@@ -1,4 +1,4 @@
-# UVC30 FOV protocol notes
+# UVC30 camera-control protocol notes
 
 These notes document the small portion of the Yealink RC8 USB HID protocol used
 by this project. They were derived from observed USB traffic and independent
@@ -42,9 +42,14 @@ by the tested firmware.
 | Operation | Message | Value | Write flag |
 | --- | --- | --- | --- |
 | save parameters (`46`) | `0x0211` | `1` | `1` |
+| get WDR (`40`) | `0x0212` | `-1` in the request; level in the reply | `0` |
+| set WDR (`40`) | `0x0211` | `0` through `5` | `1` |
 | get FOV (`56`) | `0x0212` | `-1` in the request; degrees in the reply | `0` |
 | set FOV (`56`) | `0x0211` | `70`, `90`, or `120` | `1` |
 
-Replies echo the message and transaction IDs. The tool reads the FOV back after
-setting it instead of assuming that an acknowledged write was applied, then
-sends the save-parameters operation.
+Yealink USB Connect labels operation `40` (`DRCCTRL`) as “Wide Dynamic
+Range.” It is distinct from operation `9` (`WDRCTRL`).
+
+Replies echo the message and transaction IDs. The tool reads each value back
+after setting it instead of assuming that an acknowledged write was applied,
+then sends the save-parameters operation.
