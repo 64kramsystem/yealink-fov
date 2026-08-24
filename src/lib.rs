@@ -82,7 +82,7 @@ impl Camera {
             }
             if Instant::now() >= deadline {
                 bail!(
-                    "camera reported {} degrees after setting {}; close applications that are capturing video from it, such as OBS",
+                    "camera kept reporting {} degrees after setting {}",
                     actual.degrees(),
                     fov.degrees()
                 );
@@ -110,9 +110,7 @@ impl Camera {
     }
 
     fn exchange_camera(&mut self, message: u16, operation: u32, value: i32) -> Result<Reply> {
-        let mut payload = [0_u8; CAMERA_PARAM_LEN];
-        payload[0..4].copy_from_slice(&operation.to_le_bytes());
-        payload[4..8].copy_from_slice(&value.to_le_bytes());
+        let payload = camera_payload(message, operation, value);
         self.exchange(2, message, &payload)
     }
 
@@ -161,6 +159,16 @@ impl Camera {
 
         bail!("timed out waiting for a reply from the camera")
     }
+}
+
+fn camera_payload(message: u16, operation: u32, value: i32) -> [u8; CAMERA_PARAM_LEN] {
+    let mut payload = [0_u8; CAMERA_PARAM_LEN];
+    payload[0..4].copy_from_slice(&operation.to_le_bytes());
+    payload[4..8].copy_from_slice(&value.to_le_bytes());
+    if message == CAMERA_SET {
+        payload[8..12].copy_from_slice(&1_u32.to_le_bytes());
+    }
+    payload
 }
 
 fn select_device<'a>(api: &'a HidApi, serial: Option<&str>) -> Result<&'a DeviceInfo> {
@@ -227,9 +235,7 @@ fn camera_param_report(
     operation: u32,
     value: i32,
 ) -> [u8; REPORT_LEN] {
-    let mut payload = [0_u8; CAMERA_PARAM_LEN];
-    payload[0..4].copy_from_slice(&operation.to_le_bytes());
-    payload[4..8].copy_from_slice(&value.to_le_bytes());
+    let payload = camera_payload(message, operation, value);
     rc8_report(2, message, transaction, &payload)
 }
 
@@ -309,7 +315,7 @@ mod tests {
         let report = camera_report(CAMERA_SET, 7, 90);
 
         assert_eq!(&report[4..8], &[0x11, 0x02, 0x07, 0x00]);
-        assert_eq!(&report[20..28], &[0x38, 0, 0, 0, 0x5a, 0, 0, 0]);
+        assert_eq!(&report[20..32], &[0x38, 0, 0, 0, 0x5a, 0, 0, 0, 1, 0, 0, 0]);
     }
 
     #[test]
@@ -317,7 +323,7 @@ mod tests {
         let report = camera_param_report(CAMERA_SET, 8, CAMERA_SAVE, 1);
 
         assert_eq!(&report[4..8], &[0x11, 0x02, 0x08, 0x00]);
-        assert_eq!(&report[20..28], &[0x2e, 0, 0, 0, 1, 0, 0, 0]);
+        assert_eq!(&report[20..32], &[0x2e, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]);
     }
 
     #[test]

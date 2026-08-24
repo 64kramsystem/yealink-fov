@@ -26,8 +26,7 @@ Yealink models and product IDs are not currently supported.
 
 ## Use
 
-Close Yealink USB Connect and applications actively capturing from the webcam,
-such as OBS, then choose a field of view:
+Close Yealink USB Connect, then choose a field of view:
 
 ```sh
 yealink-fov 70
@@ -58,15 +57,6 @@ Then reconnect the camera.
 
 The rule grants access to the active local desktop session through `uaccess`.
 Headless or SSH-only Linux systems may require a site-specific group rule.
-
-## Frame rate
-
-This tool changes FOV only; it cannot add capture modes that the camera does not
-advertise. Yealink's current UVC30 Desktop specifications list 4K, 1080p, and
-720p output at 30 FPS, with a 30 FPS maximum. The tested camera likewise
-advertised only 30 FPS formats to macOS, including at lower resolutions.
-
-[Yealink UVC30 Desktop product page](https://www.yealink.com/en/product-detail/camera-uvc30-desktop)
 
 ## Scope
 

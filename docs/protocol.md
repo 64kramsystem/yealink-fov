@@ -34,13 +34,16 @@ The message header contains a little-endian message ID at offset 0, transaction
 ID at offset 2, payload length at offset 4, response status at offset 8, and
 reserved zero fields elsewhere. Negative response statuses indicate failure.
 
-The camera payload starts with a little-endian operation ID and signed value:
+The camera payload starts with three little-endian 32-bit words: operation ID,
+signed value, and a write flag. The write flag must be `1` for `0x0211`
+requests and is `0` for reads; acknowledged writes with a zero flag are ignored
+by the tested firmware.
 
-| Operation | Message | Value |
-| --- | --- | --- |
-| save parameters (`46`) | `0x0211` | `1` |
-| get FOV (`56`) | `0x0212` | `-1` in the request; degrees in the reply |
-| set FOV (`56`) | `0x0211` | `70`, `90`, or `120` |
+| Operation | Message | Value | Write flag |
+| --- | --- | --- | --- |
+| save parameters (`46`) | `0x0211` | `1` | `1` |
+| get FOV (`56`) | `0x0212` | `-1` in the request; degrees in the reply | `0` |
+| set FOV (`56`) | `0x0211` | `70`, `90`, or `120` | `1` |
 
 Replies echo the message and transaction IDs. The tool reads the FOV back after
 setting it instead of assuming that an acknowledged write was applied, then
