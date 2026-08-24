@@ -1,0 +1,18 @@
+[package]
+name = "yealink-fov"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Set the field of view on a Yealink UVC30 webcam"
+license = "MIT"
+repository = "https://github.com/64kramsystem/yealink-fov"
+keywords = ["camera", "fov", "hid", "uvc30", "yealink"]
+categories = ["command-line-utilities", "hardware-support"]
+
+[dependencies]
+anyhow = "1.0.99"
+hidapi = "2.6.6"
+
+[profile.release]
+lto = true
+strip = true
